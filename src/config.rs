@@ -1,0 +1,1 @@
+pub const DIFFUSION_CONSTANT: f64 = 0.1;

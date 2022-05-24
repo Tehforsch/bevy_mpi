@@ -1,7 +1,15 @@
-use crate::{Black, Concentration, Neighbours, Red, Source};
-use bevy::prelude::*;
+use bevy::prelude::Commands;
+use uom::si::f64::*;
+use uom::si::length::meter;
+use uom::si::time::second;
 
-const GRID_SIZE: f32 = 40.0;
+use crate::quantities::number_density_unit;
+use crate::Black;
+use crate::Concentration;
+use crate::Neighbours;
+use crate::Position;
+use crate::Red;
+use crate::Source;
 
 pub fn create_grid_system(mut commands: Commands) {
     let nx = 20;
@@ -12,27 +20,16 @@ pub fn create_grid_system(mut commands: Commands) {
     for i in 0..nx {
         for j in 0..ny {
             let concentration = if i <= 10 { 1.0 } else { 0.0 };
+            let length = Length::new::<meter>(1.0);
+            let pos = Position((i as f64) * length, (j as f64) * length);
             entities.push(
                 commands
                     .spawn()
-                    .insert(Concentration(concentration))
-                    .insert(Source(0.0))
-                    .insert_bundle(SpriteBundle {
-                        transform: Transform {
-                            translation: Vec3::new(
-                                GRID_SIZE * (i as f32),
-                                GRID_SIZE * (j as f32),
-                                0.0,
-                            ),
-                            ..default()
-                        },
-                        sprite: Sprite {
-                            color: Color::rgb(0.0, 0.0, 0.0),
-                            custom_size: Some(Vec2::new(GRID_SIZE, GRID_SIZE)),
-                            ..default()
-                        },
-                        ..default()
-                    })
+                    .insert(Concentration(concentration * number_density_unit()))
+                    .insert(Source(
+                        0.0 * number_density_unit() / Time::new::<second>(1.0),
+                    ))
+                    .insert(pos)
                     .id(),
             );
         }
