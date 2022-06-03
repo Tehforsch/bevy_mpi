@@ -16,6 +16,10 @@ impl MpiWorld {
         self.world().rank()
     }
 
+    pub fn size(&self) -> i32 {
+        self.world().size()
+    }
+
     pub fn world(&self) -> SystemCommunicator {
         self.universe.world()
     }

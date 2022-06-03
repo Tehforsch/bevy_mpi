@@ -36,7 +36,7 @@ pub struct Black;
 pub fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> i32 {
     let mpi_world = MpiWorld::new();
     let rank = mpi_world.rank();
-    app.insert_non_send_resource(mpi_world);
+    app.insert_resource(mpi_world);
     rank
 }
 
