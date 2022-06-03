@@ -1,5 +1,6 @@
 mod config;
 mod create_grid;
+mod mpi;
 mod quantities;
 mod visualization;
 

@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.7.0"
+mpi = { git = "https://github.com/rsmpi/rsmpi", features = ["derive"] }
 uom = "0.32.0"
