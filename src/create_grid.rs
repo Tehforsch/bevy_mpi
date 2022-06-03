@@ -10,6 +10,8 @@ use crate::mpi_world::MpiWorld;
 use crate::quantities::number_density_unit;
 use crate::Black;
 use crate::Concentration;
+use crate::HaloCell;
+use crate::LocalCell;
 use crate::Neighbours;
 use crate::Position;
 use crate::Red;
@@ -65,6 +67,11 @@ impl GridData {
     fn iter_local_grid_cells(&self) -> impl Iterator<Item = CellIdentifier> + '_ {
         self.iter_grid_cells().filter(|cell| cell.is_local())
     }
+
+    fn iter_local_cells_and_haloes(&self) -> impl Iterator<Item = CellIdentifier> + '_ {
+        self.iter_grid_cells()
+            .filter(|cell| cell.is_local() || cell.is_halo())
+    }
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -116,31 +123,40 @@ impl CellIdentifier {
     }
 
     fn is_local(&self) -> bool {
-        ((self.grid_data.local_grid_size_x * self.grid_data.this_rank_x)
-            ..(self.grid_data.local_grid_size_x * (self.grid_data.this_rank_x + 1)))
-            .contains(&self.global_x)
-            && ((self.grid_data.local_grid_size_y * self.grid_data.this_rank_y)
-                ..(self.grid_data.local_grid_size_y * (self.grid_data.this_rank_y + 1)))
-                .contains(&self.global_y)
+        let local_x = self.global_x - self.grid_data.local_grid_size_x * self.grid_data.this_rank_x;
+        let local_y = self.global_y - self.grid_data.local_grid_size_y * self.grid_data.this_rank_y;
+        (0..self.grid_data.local_grid_size_x).contains(&local_x)
+            && (0..self.grid_data.local_grid_size_y).contains(&local_y)
+    }
+
+    fn is_halo(&self) -> bool {
+        let local_x = self.global_x - self.grid_data.local_grid_size_x * self.grid_data.this_rank_x;
+        let local_y = self.global_y - self.grid_data.local_grid_size_y * self.grid_data.this_rank_y;
+        // x at the border, y in the center
+        let is_on_x_border = local_x == -1 || local_x == self.grid_data.local_grid_size_x;
+        let is_on_y_border = local_y == -1 || local_y == self.grid_data.local_grid_size_y;
+        is_on_x_border ^ is_on_y_border
     }
 }
 
 pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
     let grid = GridData::new(60, 60, world.size(), 1, world.rank(), 0);
     let mut entities = HashMap::new();
-    for cell in grid.iter_grid_cells() {
+    for cell in grid.iter_local_cells_and_haloes() {
         let concentration = if cell.global_x <= 10 { 1.0 } else { 0.0 };
-        entities.insert(
-            cell.clone(),
-            commands
-                .spawn()
-                .insert(Concentration(concentration * number_density_unit()))
-                .insert(Source(
-                    0.0 * number_density_unit() / Time::new::<second>(1.0),
-                ))
-                .insert(cell.get_position())
-                .id(),
-        );
+        let mut entity_commands = commands.spawn();
+        entity_commands
+            .insert(Concentration(concentration * number_density_unit()))
+            .insert(Source(
+                0.0 * number_density_unit() / Time::new::<second>(1.0),
+            ))
+            .insert(cell.get_position());
+        if cell.is_local() {
+            entity_commands.insert(LocalCell);
+        } else if cell.is_halo() {
+            entity_commands.insert(HaloCell);
+        }
+        entities.insert(cell, entity_commands.id());
     }
     for cell in grid.iter_local_grid_cells() {
         let mut entity = commands.entity(entities[&cell]);

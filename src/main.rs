@@ -32,6 +32,10 @@ pub struct Timestep(TimeQuantity);
 pub struct Red;
 #[derive(Component, Debug)]
 pub struct Black;
+#[derive(Component, Debug)]
+pub struct LocalCell;
+#[derive(Component, Debug)]
+pub struct HaloCell;
 
 pub fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> i32 {
     let mpi_world = MpiWorld::new();
