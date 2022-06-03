@@ -1,12 +1,13 @@
 mod config;
 mod create_grid;
-mod mpi;
+mod mpi_world;
 mod quantities;
 mod visualization;
 
 use bevy::prelude::*;
 use config::DIFFUSION_CONSTANT;
 use create_grid::create_grid_system;
+use mpi_world::MpiWorld;
 use quantities::NumberDensity;
 use quantities::NumberDensityPerTime;
 use quantities::TimeQuantity;
@@ -32,16 +33,28 @@ pub struct Red;
 #[derive(Component, Debug)]
 pub struct Black;
 
+pub fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> i32 {
+    let mpi_world = MpiWorld::new();
+    let rank = mpi_world.rank();
+    app.insert_non_send_resource(mpi_world);
+    rank
+}
+
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_startup_system(create_grid_system)
-        .add_startup_system(setup_camera_system)
-        .add_startup_system_to_stage(StartupStage::PostStartup, spawn_sprites_system)
+    let mut app = App::new();
+    let rank = initialize_mpi_and_add_world_resource(&mut app);
+    if rank == 0 {
+        app.add_plugins(DefaultPlugins)
+            .add_startup_system(setup_camera_system)
+            .add_startup_system_to_stage(StartupStage::PostStartup, spawn_sprites_system)
+            .add_system(update_cells_visually_system);
+    } else {
+        app.add_plugins(MinimalPlugins);
+    }
+    app.add_startup_system(create_grid_system)
         .add_system(source_system)
         .add_system(diffusion_system::<Red>)
         .add_system(diffusion_system::<Black>)
-        .add_system(update_cells_visually_system)
         .insert_resource(Timestep(TimeQuantity::new::<second>(1.0)))
         .run();
 }
