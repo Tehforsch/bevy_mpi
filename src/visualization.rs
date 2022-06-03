@@ -6,7 +6,7 @@ use super::Concentration;
 use crate::quantities::number_density_unit;
 use crate::Position;
 
-const GRID_SIZE: f32 = 40.0;
+const GRID_SIZE: f32 = 20.0;
 
 pub fn update_cells_visually_system(mut cells: Query<(&mut Sprite, &Concentration)>) {
     for (mut sprite, concentration) in cells.iter_mut() {
@@ -31,7 +31,11 @@ fn get_sprite_at_position(x: Length, y: Length) -> SpriteBundle {
     let y = y / Length::new::<meter>(1.0);
     SpriteBundle {
         transform: Transform {
-            translation: Vec3::new(GRID_SIZE * x.value as f32, GRID_SIZE * y.value as f32, 0.0),
+            translation: Vec3::new(
+                GRID_SIZE * x.value as f32 - 400.0,
+                GRID_SIZE * y.value as f32 - 400.0,
+                0.0,
+            ),
             ..default()
         },
         sprite: Sprite {
