@@ -519,6 +519,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_mpi"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "mpi",
+ "uom",
+]
+
+[[package]]
 name = "bevy_pbr"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1317,15 +1326,6 @@ checksum = "73770f8e1fe7d64df17ca66ad28994a0a623ea497fa69486e14984e715c5d174"
 dependencies = [
  "adler32",
  "byteorder",
-]
-
-[[package]]
-name = "diffusion"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "mpi",
- "uom",
 ]
 
 [[package]]
