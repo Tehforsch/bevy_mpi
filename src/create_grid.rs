@@ -40,6 +40,8 @@ impl GridData {
     ) -> Self {
         assert_eq!(grid_size_x.rem_euclid(num_ranks_x), 0);
         assert_eq!(grid_size_y.rem_euclid(num_ranks_y), 0);
+        assert_eq!(grid_size_x.rem_euclid(2), 0);
+        assert_eq!(grid_size_y.rem_euclid(2), 0);
         let local_grid_size_x = grid_size_x / num_ranks_x;
         let local_grid_size_y = grid_size_y / num_ranks_y;
         Self {
@@ -130,8 +132,12 @@ impl CellIdentifier {
     }
 
     fn is_halo(&self) -> bool {
-        let local_x = self.global_x - self.grid_data.local_grid_size_x * self.grid_data.this_rank_x;
-        let local_y = self.global_y - self.grid_data.local_grid_size_y * self.grid_data.this_rank_y;
+        let local_x = (self.global_x
+            - self.grid_data.local_grid_size_x * self.grid_data.this_rank_x)
+            .rem_euclid(self.grid_data.grid_size_x);
+        let local_y = (self.global_y
+            - self.grid_data.local_grid_size_y * self.grid_data.this_rank_y)
+            .rem_euclid(self.grid_data.grid_size_y);
         // x at the border, y in the center
         let is_on_x_border = local_x == -1 || local_x == self.grid_data.local_grid_size_x;
         let is_on_y_border = local_y == -1 || local_y == self.grid_data.local_grid_size_y;
@@ -140,7 +146,7 @@ impl CellIdentifier {
 }
 
 pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
-    let grid = GridData::new(60, 60, world.size(), 1, world.rank(), 0);
+    let grid = GridData::new(30, 30, world.size(), 1, world.rank(), 0);
     let mut entities = HashMap::new();
     for cell in grid.iter_local_cells_and_haloes() {
         let concentration = if cell.global_x <= 10 { 1.0 } else { 0.0 };
@@ -154,6 +160,7 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
         if cell.is_local() {
             entity_commands.insert(LocalCell);
         } else if cell.is_halo() {
+            println!("{} {} {}", world.rank(), cell.global_x, cell.global_y);
             entity_commands.insert(HaloCell);
         }
         entities.insert(cell, entity_commands.id());
@@ -171,6 +178,46 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
             entity.insert(Red);
         } else {
             entity.insert(Black);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CellIdentifier;
+    use super::GridData;
+
+    #[test]
+    fn halo_check() {
+        let grid = GridData::new(20, 20, 2, 1, 0, 0);
+        for y in 0..20 {
+            let c = CellIdentifier {
+                global_y: y,
+                global_x: 10,
+                grid_data: grid.clone(),
+            };
+            assert!(c.is_halo());
+            let c = CellIdentifier {
+                global_y: y,
+                global_x: 19,
+                grid_data: grid.clone(),
+            };
+            assert!(c.is_halo());
+        }
+        let grid = GridData::new(20, 20, 2, 1, 1, 0);
+        for y in 0..20 {
+            let c = CellIdentifier {
+                global_y: y,
+                global_x: 0,
+                grid_data: grid.clone(),
+            };
+            assert!(c.is_halo());
+            let c = CellIdentifier {
+                global_y: y,
+                global_x: 9,
+                grid_data: grid.clone(),
+            };
+            assert!(c.is_halo());
         }
     }
 }

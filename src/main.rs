@@ -17,6 +17,8 @@ use visualization::setup_camera_system;
 use visualization::spawn_sprites_system;
 use visualization::update_cells_visually_system;
 
+use crate::quantities::number_density_unit;
+
 #[derive(Component, Debug)]
 pub struct Position(Length, Length);
 #[derive(Component, Debug)]
@@ -59,6 +61,7 @@ fn main() {
         .add_system(source_system)
         .add_system(diffusion_system::<Red>)
         .add_system(diffusion_system::<Black>)
+        .add_system(print_total_concentration_system)
         .insert_resource(Timestep(TimeQuantity::new::<second>(1.0)))
         .run();
 }
@@ -82,4 +85,14 @@ fn diffusion_system<T>(
             concentration.0 += flux;
         }
     }
+}
+
+fn print_total_concentration_system(cells: Query<&Concentration, Without<HaloCell>>) {
+    println!(
+        "Total: {}",
+        cells
+            .iter()
+            .map(|x| (x.0 / number_density_unit()).value)
+            .sum::<f64>()
+    );
 }
