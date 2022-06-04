@@ -23,4 +23,8 @@ impl MpiWorld {
     pub fn world(&self) -> SystemCommunicator {
         self.universe.world()
     }
+
+    pub fn other_ranks(&self) -> impl Iterator<Item = i32> + '_ {
+        (0..self.size()).filter(|rank| *rank != self.rank())
+    }
 }

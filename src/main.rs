@@ -31,22 +31,33 @@ pub struct Position(Length, Length);
 #[derive(Component, Debug)]
 pub struct Concentration(NumberDensity);
 #[derive(Component, Debug)]
-pub struct Source(NumberDensityPerTime);
+struct Source(NumberDensityPerTime);
 #[derive(Component, Debug)]
-pub struct Neighbours(Vec<Entity>);
+struct Neighbours(Vec<Entity>);
 
-pub struct Timestep(TimeQuantity);
+struct Timestep(TimeQuantity);
 
 #[derive(Component, Debug)]
-pub struct Red;
+struct Red;
 #[derive(Component, Debug)]
-pub struct Black;
-#[derive(Component, Debug)]
-pub struct LocalCell;
-#[derive(Component, Debug)]
-pub struct HaloCell;
+struct Black;
 
-pub fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> i32 {
+/// A cell that has its values updated by this rank
+#[derive(Component, Debug)]
+struct LocalCell;
+
+/// A cell that is only used to update local cells
+/// but whose values correspond to those of a local cell
+/// on another rank
+#[derive(Component, Debug)]
+struct HaloCell;
+
+/// A local cell which has information that another rank will need
+/// (that is, it has a halo cell corresponding to it on another rank)
+#[derive(Component, Debug)]
+struct ExchangeCell;
+
+fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> i32 {
     let mpi_world = MpiWorld::new();
     let rank = mpi_world.rank();
     app.insert_resource(mpi_world);
