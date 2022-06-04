@@ -31,28 +31,28 @@ struct GridData {
 
 impl GridData {
     fn new(
-        grid_size_x: i32,
-        grid_size_y: i32,
+        size_x: i32,
+        size_y: i32,
         num_ranks_x: i32,
         num_ranks_y: i32,
         this_rank_x: i32,
         this_rank_y: i32,
     ) -> Self {
-        assert_eq!(grid_size_x.rem_euclid(num_ranks_x), 0);
-        assert_eq!(grid_size_y.rem_euclid(num_ranks_y), 0);
-        assert_eq!(grid_size_x.rem_euclid(2), 0);
-        assert_eq!(grid_size_y.rem_euclid(2), 0);
-        let local_grid_size_x = grid_size_x / num_ranks_x;
-        let local_grid_size_y = grid_size_y / num_ranks_y;
+        assert_eq!(size_x.rem_euclid(num_ranks_x), 0);
+        assert_eq!(size_y.rem_euclid(num_ranks_y), 0);
+        assert_eq!(size_x.rem_euclid(2), 0);
+        assert_eq!(size_y.rem_euclid(2), 0);
+        let local_size_x = size_x / num_ranks_x;
+        let local_size_y = size_y / num_ranks_y;
         Self {
-            size_x: grid_size_x,
-            size_y: grid_size_y,
+            size_x,
+            size_y,
             num_ranks_x,
             num_ranks_y,
             this_rank_x,
             this_rank_y,
-            local_size_x: local_grid_size_x,
-            local_size_y: local_grid_size_y,
+            local_size_x,
+            local_size_y,
         }
     }
 
