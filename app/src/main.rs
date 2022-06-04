@@ -5,6 +5,7 @@
 // perfectly readable.
 #![allow(clippy::type_complexity)]
 
+mod communication;
 mod config;
 mod create_grid;
 mod mpi_world;
@@ -12,23 +13,26 @@ mod quantities;
 mod visualization;
 
 use bevy::prelude::*;
+use communication::send_queues::SendQueues;
 use config::DIFFUSION_CONSTANT;
 use create_grid::create_grid_system;
+use mpi::topology::Rank;
 use mpi_world::MpiWorld;
 use quantities::NumberDensity;
 use quantities::NumberDensityPerTime;
 use quantities::TimeQuantity;
 use uom::si::f64::Length;
 use uom::si::time::second;
+use uom_derive::UomEquivalence;
 use visualization::setup_camera_system;
 use visualization::spawn_sprites_system;
 use visualization::update_cells_visually_system;
 
 use crate::quantities::number_density_unit;
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, UomEquivalence)]
 pub struct Position(Length, Length);
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct Concentration(NumberDensity);
 #[derive(Component, Debug)]
 struct Source(NumberDensityPerTime);
@@ -50,16 +54,23 @@ struct LocalCell;
 /// but whose values correspond to those of a local cell
 /// on another rank
 #[derive(Component, Debug)]
-struct HaloCell;
+pub struct HaloCell(Rank);
 
 /// A local cell which has information that another rank will need
 /// (that is, it has a halo cell corresponding to it on another rank)
 #[derive(Component, Debug)]
-struct ExchangeCell;
+struct ExchangeCell {
+    rank: Rank,
+    /// The entity index on the target rank
+    entity: Entity,
+}
 
-fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> i32 {
+fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> Rank {
     let mpi_world = MpiWorld::new();
     let rank = mpi_world.rank();
+    app.insert_resource(SendQueues::<(Entity, Concentration)>::from_mpi_world(
+        &mpi_world,
+    ));
     app.insert_resource(mpi_world);
     rank
 }
@@ -77,8 +88,10 @@ fn main() {
     }
     app.add_startup_system(create_grid_system)
         .add_system(source_system)
-        .add_system(diffusion_system::<Red>)
-        .add_system(diffusion_system::<Black>)
+        .add_system(diffusion_system::<Red>.after(source_system))
+        .add_system(diffusion_system::<Black>.after(diffusion_system::<Red>))
+        .add_system(exchange_system.after(diffusion_system::<Black>))
+        .add_system(SendQueues::<Concentration>::send_all_system)
         .add_system(print_total_concentration_system)
         .insert_resource(Timestep(TimeQuantity::new::<second>(1.0)))
         .run();
@@ -102,6 +115,15 @@ fn diffusion_system<T>(
             let flux = 0.5 * DIFFUSION_CONSTANT * (neighbour_concentration.0 - concentration.0);
             concentration.0 += flux;
         }
+    }
+}
+
+fn exchange_system(
+    cells: Query<(&Concentration, &ExchangeCell)>,
+    mut queues: ResMut<SendQueues<(Entity, Concentration)>>,
+) {
+    for (concentration, cell) in cells.iter() {
+        queues.push(cell.rank, (cell.entity, concentration.clone()));
     }
 }
 

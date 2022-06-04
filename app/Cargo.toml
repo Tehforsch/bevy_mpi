@@ -1,0 +1,13 @@
+[package]
+name = "bevy_mpi"
+version = "0.1.0"
+edition = "2021"
+resolver="2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.7.0"
+mpi = { git = "https://github.com/rsmpi/rsmpi", features = ["derive"] }
+uom = "0.32.0"
+uom_derive = { path = "../uom_derive" }

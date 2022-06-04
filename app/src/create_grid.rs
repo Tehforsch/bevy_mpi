@@ -1,17 +1,21 @@
 use std::collections::HashMap;
 
 use bevy::prelude::Commands;
+use bevy::prelude::Entity;
+use bevy::prelude::Query;
 use bevy::prelude::Res;
+use mpi::topology::Rank;
+use mpi::traits::Equivalence;
 use uom::si::f64::*;
 use uom::si::length::meter;
 use uom::si::time::second;
 
+use self::grid_data::CellIdentifier;
 use self::grid_data::GridData;
 use crate::mpi_world::MpiWorld;
 use crate::quantities::number_density_unit;
 use crate::Black;
 use crate::Concentration;
-use crate::ExchangeCell;
 use crate::HaloCell;
 use crate::LocalCell;
 use crate::Neighbours;
@@ -22,7 +26,7 @@ use crate::Source;
 mod grid_data;
 
 fn get_test_concentration(pos: Position) -> Concentration {
-    let concentration = if pos.0 < Length::new::<meter>(1.0) {
+    let concentration = if pos.0 < Length::new::<meter>(10.0) {
         1.0
     } else {
         0.0
@@ -30,8 +34,15 @@ fn get_test_concentration(pos: Position) -> Concentration {
     Concentration(concentration * number_density_unit())
 }
 
-fn get_grid_for_world_size_and_rank(world_size: i32, rank: i32) -> GridData {
+fn get_grid_for_world_size_and_rank(world_size: i32, rank: Rank) -> GridData {
     GridData::new(60, 60, world_size, 1, rank, 0)
+}
+
+fn get_halo_rank(world: &MpiWorld, cell: &CellIdentifier) -> Option<Rank> {
+    world.other_ranks().find(|rank| {
+        cell.with_other_grid(get_grid_for_world_size_and_rank(world.size(), *rank))
+            .is_local()
+    })
 }
 
 pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
@@ -48,16 +59,8 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
             .insert(cell.get_position());
         if cell.is_local() {
             entity_commands.insert(LocalCell);
-            for rank in world.other_ranks() {
-                if cell
-                    .with_other_grid(&get_grid_for_world_size_and_rank(world.size(), rank))
-                    .is_halo()
-                {
-                    entity_commands.insert(ExchangeCell);
-                }
-            }
         } else if cell.is_halo() {
-            entity_commands.insert(HaloCell);
+            entity_commands.insert(HaloCell(get_halo_rank(&world, &cell).unwrap()));
         }
         entities.insert(cell, entity_commands.id());
     }
@@ -75,5 +78,21 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
         } else {
             entity.insert(Black);
         }
+    }
+}
+
+pub fn exchange_halo_information_system(
+    mut commands: Commands,
+    halo_cells: Query<(Entity, &HaloCell, &Position)>,
+    world: Res<MpiWorld>,
+) {
+    for (entity, halo_cell, pos) in halo_cells.iter() {
+        let rank = halo_cell.0;
+        #[derive(Equivalence)]
+        struct A {
+            x: f64,
+            y: f64,
+        }
+        world.send(rank, A { x: pos.0.value, y: pos.1.value });
     }
 }

@@ -86,11 +86,11 @@ impl CellIdentifier {
         }
     }
 
-    pub fn with_other_grid(&self, grid: &GridData) -> Self {
+    pub fn with_other_grid(&self, grid: GridData) -> Self {
         Self {
             x: self.x,
             y: self.y,
-            grid_data: grid.clone(),
+            grid_data: grid,
         }
     }
 
