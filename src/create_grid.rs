@@ -138,9 +138,10 @@ impl CellIdentifier {
         let local_y = (self.global_y
             - self.grid_data.local_grid_size_y * self.grid_data.this_rank_y)
             .rem_euclid(self.grid_data.grid_size_y);
-        // x at the border, y in the center
-        let is_on_x_border = local_x == -1 || local_x == self.grid_data.local_grid_size_x;
-        let is_on_y_border = local_y == -1 || local_y == self.grid_data.local_grid_size_y;
+        let is_on_x_border = (local_x + 1).rem_euclid(self.grid_data.grid_size_x) == 0
+            || local_x == self.grid_data.local_grid_size_x;
+        let is_on_y_border = (local_y + 1).rem_euclid(self.grid_data.grid_size_y) == 0
+            || local_y == self.grid_data.local_grid_size_y;
         is_on_x_border ^ is_on_y_border
     }
 }
@@ -160,7 +161,6 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
         if cell.is_local() {
             entity_commands.insert(LocalCell);
         } else if cell.is_halo() {
-            println!("{} {} {}", world.rank(), cell.global_x, cell.global_y);
             entity_commands.insert(HaloCell);
         }
         entities.insert(cell, entity_commands.id());
@@ -187,37 +187,39 @@ mod tests {
     use super::CellIdentifier;
     use super::GridData;
 
-    #[test]
-    fn halo_check() {
-        let grid = GridData::new(20, 20, 2, 1, 0, 0);
-        for y in 0..20 {
-            let c = CellIdentifier {
-                global_y: y,
-                global_x: 10,
-                grid_data: grid.clone(),
-            };
-            assert!(c.is_halo());
-            let c = CellIdentifier {
-                global_y: y,
-                global_x: 19,
-                grid_data: grid.clone(),
-            };
-            assert!(c.is_halo());
+    fn assert_is_halo(grid_data: &GridData, x: i32, y: i32) {
+        assert!(CellIdentifier {
+            global_x: x,
+            global_y: y,
+            grid_data: grid_data.clone(),
         }
-        let grid = GridData::new(20, 20, 2, 1, 1, 0);
-        for y in 0..20 {
-            let c = CellIdentifier {
-                global_y: y,
-                global_x: 0,
-                grid_data: grid.clone(),
-            };
-            assert!(c.is_halo());
-            let c = CellIdentifier {
-                global_y: y,
-                global_x: 9,
-                grid_data: grid.clone(),
-            };
-            assert!(c.is_halo());
+        .is_halo())
+    }
+
+    #[test]
+    fn halo_check_x() {
+        let size_x = 20;
+        let size_y = 40;
+        let grid = GridData::new(size_x, size_y, 2, 1, 0, 0);
+        for y in 1..size_y - 1 {
+            assert_is_halo(&grid, size_x / 2, y);
+            assert_is_halo(&grid, size_x - 1, y);
+        }
+        let grid = GridData::new(size_x, size_y, 2, 1, 1, 0);
+        for y in 1..size_y - 1 {
+            assert_is_halo(&grid, 0, y);
+            assert_is_halo(&grid, 9, y);
+        }
+    }
+
+    #[test]
+    fn halo_check_y() {
+        let size_x = 20;
+        let size_y = 40;
+        let grid = GridData::new(size_x, size_y, 1, 4, 0, 1);
+        for x in 1..size_x - 1 {
+            assert_is_halo(&grid, x, 9);
+            assert_is_halo(&grid, x, 20);
         }
     }
 }
