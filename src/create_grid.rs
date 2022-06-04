@@ -17,7 +17,7 @@ use crate::Position;
 use crate::Red;
 use crate::Source;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 struct GridData {
     size_x: i32,
     size_y: i32,
@@ -74,9 +74,17 @@ impl GridData {
         self.iter_grid_cells()
             .filter(|cell| cell.is_local() || cell.is_halo())
     }
+
+    fn wrap_x(&self, x: i32) -> i32 {
+        x.rem_euclid(self.size_x)
+    }
+
+    fn wrap_y(&self, y: i32) -> i32 {
+        y.rem_euclid(self.size_y)
+    }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct CellIdentifier {
     x: i32,
     y: i32,
@@ -93,30 +101,20 @@ impl CellIdentifier {
     }
 
     fn wrap(&self) -> Self {
-        self.new_from_global(
-            self.x.rem_euclid(self.grid_data.size_x),
-            self.y.rem_euclid(self.grid_data.size_y),
-        )
+        self.new_from_global(self.grid_data.wrap_x(self.x), self.grid_data.wrap_y(self.y))
     }
 
     fn get_position(&self) -> Position {
         let length = Length::new::<meter>(1.0);
-        Position(
-            (self.x as f64) * length,
-            (self.y as f64) * length,
-        )
+        Position((self.x as f64) * length, (self.y as f64) * length)
     }
 
     fn get_neighbours(&self) -> Vec<CellIdentifier> {
         vec![
-            self.new_from_global(self.x - 1, self.y - 1)
-                .wrap(),
-            self.new_from_global(self.x + 1, self.y - 1)
-                .wrap(),
-            self.new_from_global(self.x - 1, self.y + 1)
-                .wrap(),
-            self.new_from_global(self.x + 1, self.y + 1)
-                .wrap(),
+            self.new_from_global(self.x - 1, self.y - 1).wrap(),
+            self.new_from_global(self.x + 1, self.y - 1).wrap(),
+            self.new_from_global(self.x - 1, self.y + 1).wrap(),
+            self.new_from_global(self.x + 1, self.y + 1).wrap(),
         ]
     }
 
@@ -124,30 +122,29 @@ impl CellIdentifier {
         (self.y * self.grid_data.size_x + self.x).rem_euclid(2) == 0
     }
 
+    fn local_x(&self) -> i32 {
+        self.x - self.grid_data.local_size_x * self.grid_data.this_rank_x
+    }
+
+    fn local_y(&self) -> i32 {
+        self.y - self.grid_data.local_size_y * self.grid_data.this_rank_y
+    }
+
     fn is_local(&self) -> bool {
-        let local_x = self.x - self.grid_data.local_size_x * self.grid_data.this_rank_x;
-        let local_y = self.y - self.grid_data.local_size_y * self.grid_data.this_rank_y;
-        (0..self.grid_data.local_size_x).contains(&local_x)
-            && (0..self.grid_data.local_size_y).contains(&local_y)
+        (0..self.grid_data.local_size_x).contains(&self.local_x())
+            && (0..self.grid_data.local_size_y).contains(&self.local_y())
     }
 
     fn is_halo(&self) -> bool {
-        let local_x = (self.x
-            - self.grid_data.local_size_x * self.grid_data.this_rank_x)
-            .rem_euclid(self.grid_data.size_x);
-        let local_y = (self.y
-            - self.grid_data.local_size_y * self.grid_data.this_rank_y)
-            .rem_euclid(self.grid_data.size_y);
-        let is_on_x_border = (local_x + 1).rem_euclid(self.grid_data.size_x) == 0
-            || local_x == self.grid_data.local_size_x;
-        let is_on_y_border = (local_y + 1).rem_euclid(self.grid_data.size_y) == 0
-            || local_y == self.grid_data.local_size_y;
-        is_on_x_border ^ is_on_y_border
+        // World's laziest calculation
+        self.get_neighbours()
+            .into_iter()
+            .any(|neigh| neigh.is_local())
     }
 }
 
 pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
-    let grid = GridData::new(30, 30, world.size(), 1, world.rank(), 0);
+    let grid = GridData::new(60, 60, world.size(), 1, world.rank(), 0);
     let mut entities = HashMap::new();
     for cell in grid.iter_local_cells_and_haloes() {
         let concentration = if cell.x <= 10 { 1.0 } else { 0.0 };

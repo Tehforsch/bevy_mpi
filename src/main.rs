@@ -73,7 +73,7 @@ fn source_system(mut cells: Query<(&mut Concentration, &Source)>, timestep: Res<
 }
 
 fn diffusion_system<T>(
-    mut cells1: Query<(&mut Concentration, &Neighbours), With<T>>,
+    mut cells1: Query<(&mut Concentration, &Neighbours), (With<LocalCell>, With<T>)>,
     cells2: Query<&Concentration, Without<T>>,
 ) where
     T: Component,
@@ -87,9 +87,13 @@ fn diffusion_system<T>(
     }
 }
 
-fn print_total_concentration_system(cells: Query<&Concentration, Without<HaloCell>>) {
+fn print_total_concentration_system(
+    cells: Query<&Concentration, With<LocalCell>>,
+    world: Res<MpiWorld>,
+) {
     println!(
-        "Total: {}",
+        "{}: Total: {}",
+        world.rank(),
         cells
             .iter()
             .map(|x| (x.0 / number_density_unit()).value)
