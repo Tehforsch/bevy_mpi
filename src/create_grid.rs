@@ -19,14 +19,14 @@ use crate::Source;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct GridData {
-    grid_size_x: i32,
-    grid_size_y: i32,
+    size_x: i32,
+    size_y: i32,
     num_ranks_x: i32,
     num_ranks_y: i32,
     this_rank_x: i32,
     this_rank_y: i32,
-    local_grid_size_x: i32,
-    local_grid_size_y: i32,
+    local_size_x: i32,
+    local_size_y: i32,
 }
 
 impl GridData {
@@ -45,22 +45,22 @@ impl GridData {
         let local_grid_size_x = grid_size_x / num_ranks_x;
         let local_grid_size_y = grid_size_y / num_ranks_y;
         Self {
-            grid_size_x,
-            grid_size_y,
+            size_x: grid_size_x,
+            size_y: grid_size_y,
             num_ranks_x,
             num_ranks_y,
             this_rank_x,
             this_rank_y,
-            local_grid_size_x,
-            local_grid_size_y,
+            local_size_x: local_grid_size_x,
+            local_size_y: local_grid_size_y,
         }
     }
 
     fn iter_grid_cells(&self) -> impl Iterator<Item = CellIdentifier> + '_ {
-        (0..self.grid_size_x).flat_map(move |global_x| {
-            (0..self.grid_size_y).map(move |global_y| CellIdentifier {
-                global_x,
-                global_y,
+        (0..self.size_x).flat_map(move |global_x| {
+            (0..self.size_y).map(move |global_y| CellIdentifier {
+                x: global_x,
+                y: global_y,
                 grid_data: self.clone(),
             })
         })
@@ -78,8 +78,8 @@ impl GridData {
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 struct CellIdentifier {
-    global_x: i32,
-    global_y: i32,
+    x: i32,
+    y: i32,
     grid_data: GridData,
 }
 
@@ -87,61 +87,61 @@ impl CellIdentifier {
     fn new_from_global(&self, global_x: i32, global_y: i32) -> Self {
         Self {
             grid_data: self.grid_data.clone(),
-            global_x,
-            global_y,
+            x: global_x,
+            y: global_y,
         }
     }
 
     fn wrap(&self) -> Self {
         self.new_from_global(
-            self.global_x.rem_euclid(self.grid_data.grid_size_x),
-            self.global_y.rem_euclid(self.grid_data.grid_size_y),
+            self.x.rem_euclid(self.grid_data.size_x),
+            self.y.rem_euclid(self.grid_data.size_y),
         )
     }
 
     fn get_position(&self) -> Position {
         let length = Length::new::<meter>(1.0);
         Position(
-            (self.global_x as f64) * length,
-            (self.global_y as f64) * length,
+            (self.x as f64) * length,
+            (self.y as f64) * length,
         )
     }
 
     fn get_neighbours(&self) -> Vec<CellIdentifier> {
         vec![
-            self.new_from_global(self.global_x - 1, self.global_y - 1)
+            self.new_from_global(self.x - 1, self.y - 1)
                 .wrap(),
-            self.new_from_global(self.global_x + 1, self.global_y - 1)
+            self.new_from_global(self.x + 1, self.y - 1)
                 .wrap(),
-            self.new_from_global(self.global_x - 1, self.global_y + 1)
+            self.new_from_global(self.x - 1, self.y + 1)
                 .wrap(),
-            self.new_from_global(self.global_x + 1, self.global_y + 1)
+            self.new_from_global(self.x + 1, self.y + 1)
                 .wrap(),
         ]
     }
 
     fn is_even(&self) -> bool {
-        (self.global_y * self.grid_data.grid_size_x + self.global_x).rem_euclid(2) == 0
+        (self.y * self.grid_data.size_x + self.x).rem_euclid(2) == 0
     }
 
     fn is_local(&self) -> bool {
-        let local_x = self.global_x - self.grid_data.local_grid_size_x * self.grid_data.this_rank_x;
-        let local_y = self.global_y - self.grid_data.local_grid_size_y * self.grid_data.this_rank_y;
-        (0..self.grid_data.local_grid_size_x).contains(&local_x)
-            && (0..self.grid_data.local_grid_size_y).contains(&local_y)
+        let local_x = self.x - self.grid_data.local_size_x * self.grid_data.this_rank_x;
+        let local_y = self.y - self.grid_data.local_size_y * self.grid_data.this_rank_y;
+        (0..self.grid_data.local_size_x).contains(&local_x)
+            && (0..self.grid_data.local_size_y).contains(&local_y)
     }
 
     fn is_halo(&self) -> bool {
-        let local_x = (self.global_x
-            - self.grid_data.local_grid_size_x * self.grid_data.this_rank_x)
-            .rem_euclid(self.grid_data.grid_size_x);
-        let local_y = (self.global_y
-            - self.grid_data.local_grid_size_y * self.grid_data.this_rank_y)
-            .rem_euclid(self.grid_data.grid_size_y);
-        let is_on_x_border = (local_x + 1).rem_euclid(self.grid_data.grid_size_x) == 0
-            || local_x == self.grid_data.local_grid_size_x;
-        let is_on_y_border = (local_y + 1).rem_euclid(self.grid_data.grid_size_y) == 0
-            || local_y == self.grid_data.local_grid_size_y;
+        let local_x = (self.x
+            - self.grid_data.local_size_x * self.grid_data.this_rank_x)
+            .rem_euclid(self.grid_data.size_x);
+        let local_y = (self.y
+            - self.grid_data.local_size_y * self.grid_data.this_rank_y)
+            .rem_euclid(self.grid_data.size_y);
+        let is_on_x_border = (local_x + 1).rem_euclid(self.grid_data.size_x) == 0
+            || local_x == self.grid_data.local_size_x;
+        let is_on_y_border = (local_y + 1).rem_euclid(self.grid_data.size_y) == 0
+            || local_y == self.grid_data.local_size_y;
         is_on_x_border ^ is_on_y_border
     }
 }
@@ -150,7 +150,7 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
     let grid = GridData::new(30, 30, world.size(), 1, world.rank(), 0);
     let mut entities = HashMap::new();
     for cell in grid.iter_local_cells_and_haloes() {
-        let concentration = if cell.global_x <= 10 { 1.0 } else { 0.0 };
+        let concentration = if cell.x <= 10 { 1.0 } else { 0.0 };
         let mut entity_commands = commands.spawn();
         entity_commands
             .insert(Concentration(concentration * number_density_unit()))
@@ -189,8 +189,8 @@ mod tests {
 
     fn assert_is_halo(grid_data: &GridData, x: i32, y: i32) {
         assert!(CellIdentifier {
-            global_x: x,
-            global_y: y,
+            x,
+            y,
             grid_data: grid_data.clone(),
         }
         .is_halo())
