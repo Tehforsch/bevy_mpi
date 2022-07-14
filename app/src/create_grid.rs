@@ -4,6 +4,7 @@ use bevy::prelude::Commands;
 use bevy::prelude::Entity;
 use bevy::prelude::Query;
 use bevy::prelude::Res;
+use mpi::point_to_point::Status;
 use mpi::topology::Rank;
 use mpi::traits::Equivalence;
 use uom::si::f64::*;
@@ -13,15 +14,14 @@ use uom::si::time::second;
 use self::grid_data::CellIdentifier;
 use self::grid_data::GridData;
 use crate::mpi_world::MpiWorld;
+use crate::position::Position;
 use crate::quantities::number_density_unit;
 use crate::Black;
 use crate::Concentration;
 use crate::HaloCell;
 use crate::LocalCell;
 use crate::Neighbours;
-use crate::Position;
 use crate::Red;
-use crate::Source;
 
 mod grid_data;
 
@@ -53,7 +53,7 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
         let mut entity_commands = commands.spawn();
         entity_commands
             .insert(concentration)
-            .insert(Source(
+            .insert(crate::Source(
                 0.0 * number_density_unit() / Time::new::<second>(1.0),
             ))
             .insert(cell.get_position());
@@ -88,11 +88,23 @@ pub fn exchange_halo_information_system(
 ) {
     for (entity, halo_cell, pos) in halo_cells.iter() {
         let rank = halo_cell.0;
-        #[derive(Equivalence)]
-        struct A {
-            x: f64,
-            y: f64,
+        world.send(rank, PositionData::new(pos, &entity));
+    }
+    let (msg, _): (PositionData, Status) = world.receive_any();
+    dbg!(msg);
+}
+
+#[derive(Equivalence, Debug)]
+pub struct PositionData {
+    pos: (f64, f64),
+    entity: u64,
+}
+
+impl PositionData {
+    fn new(x: &Position, entity: &Entity) -> PositionData {
+        PositionData {
+            pos: (x.0.value, x.1.value),
+            entity: entity.to_bits(),
         }
-        world.send(rank, A { x: pos.0.value, y: pos.1.value });
     }
 }

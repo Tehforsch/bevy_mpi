@@ -3,8 +3,8 @@ use uom::si::f64::Length;
 use uom::si::length::meter;
 
 use super::Concentration;
+use crate::position::Position;
 use crate::quantities::number_density_unit;
-use crate::Position;
 
 const GRID_SIZE: f32 = 20.0;
 

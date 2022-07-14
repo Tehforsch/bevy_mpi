@@ -1,7 +1,7 @@
 use uom::si::f64::*;
 use uom::si::length::meter;
 
-use crate::Position;
+use crate::position::Position;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct GridData {
