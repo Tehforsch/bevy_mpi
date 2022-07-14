@@ -15,7 +15,7 @@ pub struct MpiWorld {
 impl MpiWorld {
     pub fn new() -> Self {
         let threading = Threading::Multiple;
-        let (universe, _) = mpi::initialize_with_threading(threading).unwrap();
+        let universe = mpi::initialize().unwrap();
         Self { universe }
     }
 

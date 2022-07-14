@@ -92,7 +92,7 @@ fn main() {
     app.add_startup_stage_after(
         StartupStage::Startup,
         ExchangeStage,
-        SystemStage::parallel(),
+        SystemStage::single_threaded(),
     );
     app.add_startup_system(create_grid_system)
         .add_startup_system_to_stage(ExchangeStage, exchange_halo_information_system)
