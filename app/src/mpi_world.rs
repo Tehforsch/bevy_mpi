@@ -31,15 +31,7 @@ impl MpiWorld {
         self.universe.world()
     }
 
-    pub fn send<T: Equivalence>(&self, rank: Rank, data: T) {
-        self.world().process_at_rank(rank).send(&data)
-    }
-
     pub fn other_ranks(&self) -> impl Iterator<Item = i32> + '_ {
         (0..self.size()).filter(|rank| *rank != self.rank())
-    }
-
-    pub fn receive_any<Message: Equivalence>(&self) -> (Message, Status) {
-        self.world().any_process().receive()
     }
 }

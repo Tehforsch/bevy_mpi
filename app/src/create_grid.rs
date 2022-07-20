@@ -5,8 +5,11 @@ use bevy::prelude::Entity;
 use bevy::prelude::Query;
 use bevy::prelude::Res;
 use mpi::point_to_point::Status;
+use mpi::topology::Communicator;
 use mpi::topology::Rank;
+use mpi::traits::Destination;
 use mpi::traits::Equivalence;
+use mpi::traits::Source;
 use uom::si::f64::*;
 use uom::si::length::meter;
 use uom::si::time::second;
@@ -18,6 +21,7 @@ use crate::position::Position;
 use crate::quantities::number_density_unit;
 use crate::Black;
 use crate::Concentration;
+use crate::ExchangeCell;
 use crate::HaloCell;
 use crate::LocalCell;
 use crate::Neighbours;
@@ -86,12 +90,34 @@ pub fn exchange_halo_information_system(
     halo_cells: Query<(Entity, &HaloCell, &Position)>,
     world: Res<MpiWorld>,
 ) {
-    for (entity, halo_cell, pos) in halo_cells.iter() {
-        let rank = halo_cell.0;
-        world.send(rank, PositionData::new(pos, &entity));
+    let pos_data: HashMap<i32, Vec<PositionData>> = world
+        .other_ranks()
+        .map(|i| {
+            (
+                i,
+                halo_cells
+                    .iter()
+                    .filter(|(_, cell, _)| cell.0 == i)
+                    .map(|(entity, _, pos)| PositionData::new(pos, &entity))
+                    .collect(),
+            )
+        })
+        .collect();
+    for (rank, data) in pos_data.iter() {
+        world.world().process_at_rank(*rank).send(&data[..]);
     }
-    let (msg, _): (PositionData, Status) = world.receive_any();
-    dbg!(msg);
+    for rank in world.other_ranks() {
+        let (msg, status): (Vec<PositionData>, Status) =
+            world.world().process_at_rank(rank).receive_vec();
+        for pos in msg.iter() {
+            let rank = status.source_rank();
+            dbg!(rank, pos.pos());
+            commands.spawn().insert(pos.pos()).insert(ExchangeCell {
+                rank,
+                entity: Entity::from_bits(pos.entity),
+            });
+        }
+    }
 }
 
 #[derive(Equivalence, Debug)]
@@ -106,5 +132,12 @@ impl PositionData {
             pos: (x.0.value, x.1.value),
             entity: entity.to_bits(),
         }
+    }
+
+    fn pos(&self) -> Position {
+        Position(
+            Length::new::<meter>(self.pos.0),
+            Length::new::<meter>(self.pos.1),
+        )
     }
 }
