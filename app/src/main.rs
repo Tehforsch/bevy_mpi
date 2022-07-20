@@ -70,6 +70,8 @@ struct ExchangeCell {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, StageLabel)]
+struct StartupExchangeStage;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, StageLabel)]
 struct ExchangeStage;
 
 fn initialize_mpi_and_add_world_resource(app: &mut bevy::prelude::App) -> Rank {
@@ -92,16 +94,21 @@ fn main() {
     }
     app.add_startup_stage_after(
         StartupStage::Startup,
+        StartupExchangeStage,
+        SystemStage::single_threaded(),
+    );
+    app.add_stage_after(
+        CoreStage::Update,
         ExchangeStage,
         SystemStage::single_threaded(),
     );
     app.add_startup_system(create_grid_system)
-        .add_startup_system_to_stage(ExchangeStage, setup_halo_exchange_system)
+        .add_startup_system_to_stage(StartupExchangeStage, setup_halo_exchange_system)
         .add_system(source_system)
         .add_system(diffusion_system::<Red>.after(source_system))
         .add_system(diffusion_system::<Black>.after(diffusion_system::<Red>))
-        .add_system(halo_exchange_system.after(diffusion_system::<Black>))
         .add_system(print_total_concentration_system)
+        .add_system_to_stage(ExchangeStage, halo_exchange_system)
         .insert_resource(Timestep(TimeQuantity::new::<second>(1.0)))
         .run();
 }

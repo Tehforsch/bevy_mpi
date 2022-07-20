@@ -5,6 +5,7 @@ use bevy::prelude::Entity;
 use bevy::prelude::Query;
 use bevy::prelude::Res;
 use bevy::prelude::With;
+use bevy::prelude::Without;
 use mpi::point_to_point::Status;
 use mpi::topology::Communicator;
 use mpi::topology::Rank;
@@ -128,8 +129,8 @@ pub(super) fn setup_halo_exchange_system(
 }
 
 pub(super) fn halo_exchange_system(
-    mut halo_cells: Query<&mut Concentration, With<HaloCell>>,
-    exchange_cells: Query<(&Concentration, &ExchangeCell)>,
+    mut halo_cells: Query<&mut Concentration, (With<HaloCell>, Without<ExchangeCell>)>,
+    exchange_cells: Query<(&Concentration, &ExchangeCell), Without<HaloCell>>,
     world: Res<MpiWorld>,
 ) {
     let data: HashMap<i32, Vec<ConcentrationData>> = world
