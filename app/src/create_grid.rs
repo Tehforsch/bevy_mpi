@@ -4,6 +4,7 @@ use bevy::prelude::Commands;
 use bevy::prelude::Entity;
 use bevy::prelude::Query;
 use bevy::prelude::Res;
+use bevy::prelude::With;
 use mpi::point_to_point::Status;
 use mpi::topology::Communicator;
 use mpi::topology::Rank;
@@ -85,9 +86,10 @@ pub fn create_grid_system(mut commands: Commands, world: Res<MpiWorld>) {
     }
 }
 
-pub fn exchange_halo_information_system(
+pub(super) fn setup_halo_exchange_system(
     mut commands: Commands,
     halo_cells: Query<(Entity, &HaloCell, &Position)>,
+    local_cells: Query<(Entity, &Position), With<LocalCell>>,
     world: Res<MpiWorld>,
 ) {
     let pos_data: HashMap<i32, Vec<PositionData>> = world
@@ -111,11 +113,52 @@ pub fn exchange_halo_information_system(
             world.world().process_at_rank(rank).receive_vec();
         for pos in msg.iter() {
             let rank = status.source_rank();
-            dbg!(rank, pos.pos());
-            commands.spawn().insert(pos.pos()).insert(ExchangeCell {
+            let target_pos = pos.pos();
+            let local_cell = local_cells
+                .iter()
+                .find(|(_, pos)| pos == &&target_pos)
+                .unwrap()
+                .0;
+            commands.entity(local_cell).insert(ExchangeCell {
                 rank,
                 entity: Entity::from_bits(pos.entity),
             });
+        }
+    }
+}
+
+pub(super) fn halo_exchange_system(
+    mut halo_cells: Query<&mut Concentration, With<HaloCell>>,
+    exchange_cells: Query<(&Concentration, &ExchangeCell)>,
+    world: Res<MpiWorld>,
+) {
+    let data: HashMap<i32, Vec<ConcentrationData>> = world
+        .other_ranks()
+        .map(move |rank| {
+            (
+                rank,
+                exchange_cells
+                    .iter()
+                    .filter(|(_, cell)| cell.rank == rank)
+                    .map(|(concentration, cell)| ConcentrationData {
+                        concentration: concentration.0.value,
+                        entity: cell.entity.to_bits(),
+                    })
+                    .collect(),
+            )
+        })
+        .collect();
+    for rank in world.other_ranks() {
+        world.world().process_at_rank(rank).send(&data[&rank]);
+    }
+    for rank in world.other_ranks() {
+        let (msg, _): (Vec<ConcentrationData>, _) =
+            world.world().process_at_rank(rank).receive_vec();
+        for cell in msg {
+            halo_cells
+                .get_mut(Entity::from_bits(cell.entity))
+                .unwrap()
+                .0 = number_density_unit() * cell.concentration;
         }
     }
 }
@@ -140,4 +183,10 @@ impl PositionData {
             Length::new::<meter>(self.pos.1),
         )
     }
+}
+
+#[derive(Equivalence)]
+struct ConcentrationData {
+    concentration: f64,
+    entity: u64,
 }

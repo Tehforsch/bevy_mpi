@@ -15,7 +15,8 @@ mod visualization;
 use bevy::prelude::*;
 use config::DIFFUSION_CONSTANT;
 use create_grid::create_grid_system;
-use create_grid::exchange_halo_information_system;
+use create_grid::halo_exchange_system;
+use create_grid::setup_halo_exchange_system;
 use mpi::topology::Rank;
 use mpi_world::MpiWorld;
 use quantities::number_density_unit;
@@ -95,11 +96,12 @@ fn main() {
         SystemStage::single_threaded(),
     );
     app.add_startup_system(create_grid_system)
-        .add_startup_system_to_stage(ExchangeStage, exchange_halo_information_system)
+        .add_startup_system_to_stage(ExchangeStage, setup_halo_exchange_system)
         .add_system(source_system)
         .add_system(diffusion_system::<Red>.after(source_system))
         .add_system(diffusion_system::<Black>.after(diffusion_system::<Red>))
-        // .add_system(print_total_concentration_system)
+        .add_system(halo_exchange_system.after(diffusion_system::<Black>))
+        .add_system(print_total_concentration_system)
         .insert_resource(Timestep(TimeQuantity::new::<second>(1.0)))
         .run();
 }

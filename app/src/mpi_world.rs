@@ -1,12 +1,6 @@
 use mpi::environment::Universe;
-use mpi::point_to_point::Status;
 use mpi::topology::Communicator;
-use mpi::topology::Rank;
 use mpi::topology::SystemCommunicator;
-use mpi::traits::Destination;
-use mpi::traits::Equivalence;
-use mpi::traits::Source;
-use mpi::Threading;
 
 pub struct MpiWorld {
     universe: Universe,
@@ -14,7 +8,6 @@ pub struct MpiWorld {
 
 impl MpiWorld {
     pub fn new() -> Self {
-        let threading = Threading::Multiple;
         let universe = mpi::initialize().unwrap();
         Self { universe }
     }
